@@ -146,8 +146,20 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: typography.body.fontSize,
   },
+  forgotLink: {
+    alignSelf: 'flex-end',
+    marginTop: Spacing.two,
+  },
+  forgotLinkText: {
+    color: colors.primaryAccent,
+    fontSize: typography.caption.fontSize,
+  },
   error: {
     color: colors.secondaryAccent,
+    marginTop: Spacing.three,
+  },
+  info: {
+    color: colors.chartSage,
     marginTop: Spacing.three,
   },
   primaryButton: {

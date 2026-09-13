@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "skills": {
+    "awesome-design-html": {
+      "source": "yzfly/awesome-design-html",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "b137b26043da286619f046a6a891116bd252f86eda92179c39eff3ce20e4c519"
+    },
+    "playwright-skill": {
+      "source": "lackeyjb/playwright-skill",
+      "sourceType": "github",
+      "skillPath": "skills/playwright-skill/SKILL.md",
+      "computedHash": "813e921d157dccfeff1b2f60dd0cdb1fe7dd02c77c2762cb7dd320dae17fc562"
+    },
+    "screenshot-to-code": {
+      "source": "onewave-ai/claude-skills",
+      "sourceType": "github",
+      "skillPath": "screenshot-to-code/SKILL.md",
+      "computedHash": "983fa7f4870e5b5d6e48b623f2a9bcd25b2caad977a2d36b2214200d0995c4bb"
+    },
+    "web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/web-design-guidelines/SKILL.md",
+      "computedHash": "a6a44d5498f7e8f68289902f3dedfc6f38ae0cee1e96527c80724cf27f727c2a"
+    }
+  }
+}

@@ -22,7 +22,15 @@ export function formatCurrency(amount: number, currency: CurrencyCode) {
 
 // The standalone symbol/code for a currency (e.g. "$", "€", "E£"), for use as
 // an inline prefix in amount inputs rather than a fully formatted amount.
+//
+// Built from `.format()` rather than `.formatToParts()` — Hermes doesn't
+// implement `formatToParts` and throws "undefined is not a function" on it.
 export function getCurrencySymbol(currency: CurrencyCode) {
-  const parts = new Intl.NumberFormat('en-US', { style: 'currency', currency }).formatToParts(0);
-  return parts.find((part) => part.type === 'currency')?.value ?? currency;
+  const formatted = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(0);
+  return formatted.replace(/[\d\s]/g, '') || currency;
 }

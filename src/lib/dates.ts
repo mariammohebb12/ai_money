@@ -37,6 +37,15 @@ export function addMonths(date: Date, amount: number) {
   return result;
 }
 
+// A time-of-day greeting — "Good morning/afternoon/evening" — shared by any
+// screen that opens with one, so it always matches the device's actual clock.
+export function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
 // Describes a due date relative to today, e.g. for a bill's due_date.
 export function describeDueDate(dueDate: Date) {
   const diffDays = Math.round((dueDate.getTime() - startOfToday().getTime()) / 86400000);

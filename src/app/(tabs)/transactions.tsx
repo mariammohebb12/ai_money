@@ -1,9 +1,19 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  SectionList,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/screen-header';
 import { Spacing, colors, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useCurrency } from '@/hooks/use-currency';
@@ -50,6 +60,7 @@ export default function TransactionsScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | number | 'all'>('all');
 
   const fetchTransactions = useCallback(async () => {
     if (!session) return;
@@ -78,8 +89,26 @@ export default function TransactionsScreen() {
     setIsRefreshing(false);
   }
 
+  // The distinct categories actually present in this user's transactions,
+  // used to build the filter row — rather than every category that exists,
+  // which would include ones they've never used.
+  const availableCategories = useMemo(() => {
+    const seen = new Map<string | number, Category>();
+    for (const transaction of transactions) {
+      if (transaction.category && !seen.has(transaction.category.id)) {
+        seen.set(transaction.category.id, transaction.category);
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [transactions]);
+
+  const filteredTransactions = useMemo(() => {
+    if (selectedCategoryId === 'all') return transactions;
+    return transactions.filter((transaction) => transaction.category?.id === selectedCategoryId);
+  }, [transactions, selectedCategoryId]);
+
   const sections = useMemo(() => {
-    const sorted = [...transactions].sort((a, b) => (a.transaction_date < b.transaction_date ? 1 : -1));
+    const sorted = [...filteredTransactions].sort((a, b) => (a.transaction_date < b.transaction_date ? 1 : -1));
     const today = startOfToday();
     const order: string[] = [];
     const grouped = new Map<string, Transaction[]>();
@@ -92,12 +121,12 @@ export default function TransactionsScreen() {
       grouped.get(title)!.push(transaction);
     }
     return order.map((title) => ({ title, data: grouped.get(title)! }));
-  }, [transactions]);
+  }, [filteredTransactions]);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Transactions</Text>
+        <ScreenHeader title="Transactions" subtitle="Every expense and income, in order" />
         <Pressable style={styles.addButton} onPress={() => router.push('/add-transaction')}>
           <Feather name="plus" size={20} color={colors.background} />
         </Pressable>
@@ -106,18 +135,48 @@ export default function TransactionsScreen() {
       {isLoading ? (
         <ActivityIndicator style={styles.loading} color={colors.primaryAccent} />
       ) : (
-        <SectionList
-          sections={sections}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.list}
-          renderItem={({ item }) => <TransactionRow transaction={item} />}
-          renderSectionHeader={({ section }) => <Text style={styles.sectionHeader}>{section.title}</Text>}
-          stickySectionHeadersEnabled
-          refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.primaryAccent} />
-          }
-          ListEmptyComponent={<EmptyState />}
-        />
+        <>
+          {availableCategories.length > 0 && (
+            <View style={styles.filterWrap}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+                <Pressable
+                  onPress={() => setSelectedCategoryId('all')}
+                  style={[styles.filterChip, selectedCategoryId === 'all' && styles.filterChipSelected]}>
+                  <Text
+                    style={[styles.filterChipText, selectedCategoryId === 'all' && styles.filterChipTextSelected]}>
+                    All
+                  </Text>
+                </Pressable>
+                {availableCategories.map((category) => {
+                  const isSelected = selectedCategoryId === category.id;
+                  return (
+                    <Pressable
+                      key={category.id}
+                      onPress={() => setSelectedCategoryId(category.id)}
+                      style={[styles.filterChip, isSelected && styles.filterChipSelected]}>
+                      <Text style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>
+                        {category.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+          <SectionList
+            sections={sections}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={styles.list}
+            renderItem={({ item }) => <TransactionRow transaction={item} />}
+            renderSectionHeader={({ section }) => <Text style={styles.sectionHeader}>{section.title}</Text>}
+            stickySectionHeadersEnabled
+            refreshControl={
+              <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.primaryAccent} />
+            }
+            ListEmptyComponent={<EmptyState hasAnyTransactions={transactions.length > 0} />}
+          />
+        </>
       )}
     </SafeAreaView>
   );
@@ -152,13 +211,25 @@ function TransactionRow({ transaction }: { transaction: Transaction }) {
   );
 }
 
-function EmptyState() {
+function EmptyState({ hasAnyTransactions }: { hasAnyTransactions: boolean }) {
+  if (hasAnyTransactions) {
+    return (
+      <View style={styles.emptyState}>
+        <View style={styles.emptyIconBadge}>
+          <Feather name="filter" size={22} color={colors.primaryAccent} />
+        </View>
+        <Text style={styles.emptyTitle}>No transactions here</Text>
+        <Text style={styles.emptySubtitle}>Nothing in this category yet — try a different filter.</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.emptyState}>
       <View style={styles.emptyIconBadge}>
         <Feather name="inbox" size={22} color={colors.primaryAccent} />
       </View>
-      <Text style={styles.emptyTitle}>Your money story starts here ✨</Text>
+      <Text style={styles.emptyTitle}>Your money story starts here</Text>
       <Text style={styles.emptySubtitle}>Add your first transaction to get started.</Text>
     </View>
   );
@@ -175,11 +246,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  title: {
-    color: colors.text,
-    fontSize: typography.title.fontSize,
-    fontWeight: typography.title.fontWeight,
-  },
   addButton: {
     backgroundColor: colors.primaryAccent,
     borderRadius: 20,
@@ -192,8 +258,35 @@ const styles = StyleSheet.create({
     marginTop: Spacing.five,
   },
   list: {
-    marginTop: Spacing.four,
+    marginTop: Spacing.three,
     flexGrow: 1,
+  },
+  filterWrap: {
+    marginTop: Spacing.three,
+  },
+  filterRow: {
+    gap: Spacing.two,
+  },
+  filterChip: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+  },
+  filterChipSelected: {
+    backgroundColor: colors.primaryAccent + '1F',
+    borderColor: colors.primaryAccent,
+  },
+  filterChipText: {
+    color: colors.textMuted,
+    fontSize: typography.caption.fontSize,
+  },
+  filterChipTextSelected: {
+    color: colors.primaryAccent,
+    fontWeight: '700',
+    opacity: 1,
   },
   sectionHeader: {
     backgroundColor: colors.background,

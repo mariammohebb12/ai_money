@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
   const eightWeeksAgo = new Date();
   eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56);
 
-  const [transactionsResult, goalsResult, billsResult, profileResult] = await Promise.all([
+  const [transactionsResult, goalsResult, billsResult, profileResult, budgetsResult] = await Promise.all([
     supabase
       .from('transactions')
       .select('amount, type, merchant, transaction_date, category:categories(name)')
@@ -77,11 +77,34 @@ Deno.serve(async (req) => {
       .eq('is_paid', false)
       .order('due_date', { ascending: true }),
     supabase.from('profiles').select('currency').eq('id', user.id).maybeSingle(),
+    supabase.from('budgets').select('monthly_limit, category:categories(name)').eq('user_id', user.id),
   ]);
 
   // Display currency only — the numbers below are never converted, just
   // labeled/formatted differently depending on what the user picked in Profile.
   const currency = profileResult.data?.currency ?? 'USD';
+
+  // Budget status is derived from the same 8-week transaction fetch above
+  // (filtered down to the current calendar month) rather than a separate
+  // query — every category with a budget currently in effect is covered by
+  // it since a calendar month is always well within an 8-week window.
+  const currentMonthPrefix = toDateString(new Date()).slice(0, 7); // "YYYY-MM"
+  const monthToDateByCategory: Record<string, number> = {};
+  for (const t of transactionsResult.data ?? []) {
+    if (t.type !== 'expense' || !t.transaction_date.startsWith(currentMonthPrefix)) continue;
+    const categoryName = (t.category as { name: string } | null)?.name ?? 'Uncategorized';
+    monthToDateByCategory[categoryName] = (monthToDateByCategory[categoryName] ?? 0) + t.amount;
+  }
+  const budgetStatus = (budgetsResult.data ?? []).map((b) => {
+    const categoryName = (b.category as { name: string } | null)?.name ?? 'Unknown';
+    const spentThisMonth = monthToDateByCategory[categoryName] ?? 0;
+    return {
+      category: categoryName,
+      monthly_limit: b.monthly_limit,
+      spent_this_month: spentThisMonth,
+      percent_used: b.monthly_limit > 0 ? Math.round((spentThisMonth / b.monthly_limit) * 100) : 0,
+    };
+  });
 
   const financialContext = {
     recent_transactions_last_8_weeks: (transactionsResult.data ?? []).map((t) => ({
@@ -93,6 +116,7 @@ Deno.serve(async (req) => {
     })),
     savings_goals: goalsResult.data ?? [],
     upcoming_unpaid_bills: billsResult.data ?? [],
+    monthly_budgets: budgetStatus,
   };
 
   const currencyInstruction = `All amounts below are in ${currency}. When you mention an amount, format it
@@ -112,12 +136,16 @@ so a genuinely useful insight must NOT just restate one of those numbers (e.g. n
 on Y" or "Your savings rate is X%"). Instead, look for something they would NOT immediately notice
 themselves, in this priority order:
 
-1. A COMPARISON or TREND — this period/category vs. their average, vs. an earlier period in the 8 weeks,
+1. Their BUDGET STATUS this month, from monthly_budgets — if any category is at or above 80% of its
+   monthly_limit, that's usually the single most useful thing to surface (e.g. "You're close to your Food
+   budget this month — $180 of your $200 limit" or "You've gone over your Shopping budget by $40 this
+   month"). Skip this if no budget is at or above 80%, or if monthly_budgets is empty.
+2. A COMPARISON or TREND — this period/category vs. their average, vs. an earlier period in the 8 weeks,
    or vs. another category, using only the 8 weeks of data given (e.g. "Your Food spending is 40% higher
    than your daily average" or "You're spending noticeably more this week than you were a month ago").
-2. A PATTERN or ANOMALY — a recurring behavior or something unusual in the dates/categories/merchants
+3. A PATTERN or ANOMALY — a recurring behavior or something unusual in the dates/categories/merchants
    (e.g. "You've spent money on Shopping 3 days in a row" or "Most of your spending happens on weekends").
-3. Something ACTIONABLE or FORWARD-LOOKING — a projection grounded strictly in the given 8 weeks, never
+4. Something ACTIONABLE or FORWARD-LOOKING — a projection grounded strictly in the given 8 weeks, never
    referencing a period outside this data (e.g. "At this pace, you'll spend 200 more than the first half
    of this period by the end of it").
 
@@ -132,6 +160,12 @@ Below is the user's real financial data as of right now, as JSON. Use it natural
 questions and reference specific numbers, merchants, categories, or bill/goal names where relevant.
 Never mention that you were given JSON or refer to it as "the data" — just speak as if you know their finances.
 If the data doesn't cover what they're asking, say so honestly instead of guessing.
+
+Keep replies SHORT — under 40 words by default, like a text from a sharp friend, not an essay. Pick the
+single most useful point rather than covering everything possible. No headers, no bullet lists, no
+restating the question back, no compound sentences stitched together with semicolons to pack more in.
+Only go longer than 40 words if the user explicitly asks for detail, a breakdown, or a step-by-step
+plan — and even then, stay as tight as the request allows.
 
 ${currencyInstruction}
 
@@ -157,7 +191,7 @@ ${JSON.stringify(financialContext)}`;
     body: JSON.stringify({
       model: 'gpt-4o-mini',
       messages: openaiMessages,
-      max_tokens: isInsightMode ? 60 : undefined,
+      max_tokens: isInsightMode ? 60 : 100,
     }),
   });
 

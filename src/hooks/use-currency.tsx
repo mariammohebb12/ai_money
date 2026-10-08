@@ -12,8 +12,7 @@ type CurrencyContextValue = {
 };
 
 const CurrencyContext = createContext<CurrencyContextValue>({
-  currency: 'USD',
-  symbol: getCurrencySymbol('USD'),
+  currency: 'USD  symbol: getCurrencySymbol('USD'),
   setCurrency: async () => ({ error: null }),
   formatAmount: (amount) => formatCurrency(amount, 'USD'),
 });

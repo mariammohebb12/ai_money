@@ -9,8 +9,20 @@ import { colors } from '@/constants/theme';
 export function ModalCloseButton() {
   const router = useRouter();
 
+  function handleClose() {
+    // If this screen was reached with nothing behind it in the stack (a dev
+    // reload while sitting on it, a deep link), router.back() has nowhere to
+    // go and fails silently with a "GO_BACK not handled" warning — fall back
+    // to sending the user home instead of leaving the close button dead.
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
+  }
+
   return (
-    <Pressable style={styles.button} onPress={() => router.back()} hitSlop={8}>
+    <Pressable style={styles.button} onPress={handleClose} hitSlop={8}>
       <Feather name="x" size={18} color={colors.text} />
     </Pressable>
   );

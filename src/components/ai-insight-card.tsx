@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -74,7 +75,7 @@ export function AiInsightCard({
   return (
     <View style={styles.card}>
       <View style={styles.badge}>
-        <Text style={styles.badgeIcon}>✨</Text>
+        <Ionicons name="sparkles" size={15} color={colors.chartDustyBlue} />
       </View>
       <View style={styles.textWrap}>
         <Text style={styles.label}>AI Insight</Text>
@@ -104,9 +105,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.chartDustyBlue + '26',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  badgeIcon: {
-    fontSize: 15,
   },
   textWrap: {
     flex: 1,

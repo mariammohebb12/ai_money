@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withRepeat, withTiming } from 'react-native-reanimated';
 
 import { Spacing, colors, typography } from '@/constants/theme';
+import { getGreeting } from '@/lib/dates';
 import { supabase } from '@/lib/supabase';
 
 type ChatMessage = {
@@ -24,13 +25,6 @@ type ChatMessage = {
 };
 
 const SUGGESTED_PROMPTS = ['Why am I spending more?', 'How can I reach my goal faster?', 'Any bills coming up?'];
-
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
-}
 
 export default function AiCoachScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -141,7 +135,7 @@ export default function AiCoachScreen() {
 function EmptyState({ onSelectPrompt }: { onSelectPrompt: (text: string) => void }) {
   return (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyGreeting}>{getGreeting()} 👋</Text>
+      <Text style={styles.emptyGreeting}>{getGreeting()}</Text>
       <Text style={styles.emptySubtitle}>What would you like to know about your money?</Text>
 
       <View style={styles.promptList}>

@@ -393,17 +393,20 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     marginTop: Spacing.one,
+    textAlign: 'center',
   },
   avatarHint: {
     color: colors.textMuted,
     fontSize: 12,
     marginTop: Spacing.one,
+    textAlign: 'center',
   },
   email: {
     color: colors.textMuted,
     fontSize: typography.body.fontSize,
     marginTop: Spacing.two,
     marginBottom: Spacing.two,
+    textAlign: 'center',
   },
   label: {
     color: colors.text,

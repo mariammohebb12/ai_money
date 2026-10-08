@@ -1,10 +1,7 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import {
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,13 +12,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AmountInput } from '@/components/amount-input';
-import { ModalCloseButton } from '@/components/modal-close-button';
 import { Spacing, colors, typography } from '@/constants/theme';
-import { useAuth } from '@/hooks/use-auth';
-import { useSaveSuccess } from '@/hooks/use-save-success';
-import { toDateString } from '@/lib/dates';
 import { supabase } from '@/lib/supabase';
+
+// TEMPORARY until real login exists. To get a real id:
+// Supabase Dashboard → Authentication → Users → copy a user's UUID
+// (or click "Add user" to create a throwaway test account and copy its id).
+const TEMP_USER_ID = 'ae6f8eb5-6b79-489d-b057-1509c6ea276a';
 
 type Category = {
   id: string | number;
@@ -37,14 +34,11 @@ function withAlpha(hex: string, alpha: string) {
 
 export default function AddTransactionScreen() {
   const router = useRouter();
-  const { session } = useAuth();
 
   const [amount, setAmount] = useState('');
   const [isIncome, setIsIncome] = useState(false);
   const [merchant, setMerchant] = useState('');
   const [note, setNote] = useState('');
-  const [transactionDate, setTransactionDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const [expenseCategories, setExpenseCategories] = useState<Category[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | number | null>(null);
@@ -52,7 +46,6 @@ export default function AddTransactionScreen() {
 
   const [errorMessage, setErrorMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const { justSaved, triggerSuccess } = useSaveSuccess(() => router.back());
 
   const selectedCategory = expenseCategories.find((c) => c.id === selectedCategoryId);
   const isOtherSelected = selectedCategory?.name === 'Other';
@@ -102,20 +95,14 @@ export default function AddTransactionScreen() {
       return;
     }
 
-    if (!session) {
-      setErrorMessage('You need to be logged in to save a transaction.');
-      return;
-    }
-
     setIsSaving(true);
     const { error } = await supabase.from('transactions').insert({
-      user_id: session.user.id,
+      user_id: TEMP_USER_ID,
       amount: parsedAmount,
       type: isIncome ? 'income' : 'expense',
       category_id: categoryId,
       merchant,
       note: note || null,
-      transaction_date: toDateString(transactionDate),
     });
     setIsSaving(false);
 
@@ -124,60 +111,29 @@ export default function AddTransactionScreen() {
       return;
     }
 
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    triggerSuccess();
+    router.back();
   }
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
-          <ModalCloseButton />
-          <Text style={styles.title}>Add transaction</Text>
-        </View>
+        <Text style={styles.title}>Add transaction</Text>
 
         <Text style={styles.label}>Amount</Text>
-        <AmountInput value={amount} onChangeText={setAmount} autoFocus />
-
-        <Text style={styles.label}>Date</Text>
-        <Pressable style={styles.input} onPress={() => setShowDatePicker(true)}>
-          <Text style={styles.dateValue}>
-            {transactionDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-          </Text>
-        </Pressable>
-
-        {showDatePicker && (
-          <View style={styles.pickerWrap}>
-            <DateTimePicker
-              value={transactionDate}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'inline' : 'calendar'}
-              maximumDate={new Date()}
-              onChange={(event, selectedDate) => {
-                if (Platform.OS === 'android') {
-                  setShowDatePicker(false);
-                }
-                if (event.type === 'set' && selectedDate) {
-                  setTransactionDate(selectedDate);
-                }
-              }}
-            />
-            {Platform.OS === 'ios' && (
-              <Pressable style={styles.pickerDoneButton} onPress={() => setShowDatePicker(false)}>
-                <Text style={styles.pickerDoneText}>Done</Text>
-              </Pressable>
-            )}
-          </View>
-        )}
+        <TextInput
+          style={styles.input}
+          value={amount}
+          onChangeText={setAmount}
+          placeholder="0.00"
+          placeholderTextColor={colors.text + '80'}
+          keyboardType="decimal-pad"
+        />
 
         <View style={styles.toggleRow}>
           <Text style={styles.label}>{isIncome ? 'Income' : 'Expense'}</Text>
           <Switch
             value={isIncome}
-            onValueChange={(value) => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setIsIncome(value);
-            }}
+            onValueChange={setIsIncome}
             trackColor={{ false: colors.secondaryAccent, true: colors.chartSage }}
           />
         </View>
@@ -226,7 +182,7 @@ export default function AddTransactionScreen() {
                   value={note}
                   onChangeText={setNote}
                   placeholder="e.g. Gift, Pet supplies"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={colors.text + '80'}
                 />
               </>
             )}
@@ -239,7 +195,7 @@ export default function AddTransactionScreen() {
           value={merchant}
           onChangeText={setMerchant}
           placeholder={isIncome ? 'e.g. Salary, Freelance client, Gift' : 'e.g. Starbucks, Uber, Rent'}
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={colors.text + '80'}
         />
 
         {!isOtherSelected && (
@@ -250,25 +206,15 @@ export default function AddTransactionScreen() {
               value={note}
               onChangeText={setNote}
               placeholder="Add a note"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={colors.text + '80'}
             />
           </>
         )}
 
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
 
-        <Pressable
-          style={[styles.saveButton, justSaved && styles.saveButtonSuccess]}
-          onPress={handleSave}
-          disabled={isSaving || justSaved}>
-          {justSaved ? (
-            <View style={styles.saveButtonSuccessContent}>
-              <Feather name="check" size={16} color={colors.background} />
-              <Text style={styles.saveButtonText}>Saved</Text>
-            </View>
-          ) : (
-            <Text style={styles.saveButtonText}>{isSaving ? 'Saving…' : 'Save'}</Text>
-          )}
+        <Pressable style={styles.saveButton} onPress={handleSave} disabled={isSaving}>
+          <Text style={styles.saveButtonText}>{isSaving ? 'Saving…' : 'Save'}</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -283,16 +229,11 @@ const styles = StyleSheet.create({
   content: {
     padding: Spacing.four,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    marginBottom: Spacing.two,
-  },
   title: {
     color: colors.text,
-    fontSize: typography.title.fontSize,
-    fontWeight: typography.title.fontWeight,
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: Spacing.two,
   },
   label: {
     color: colors.text,
@@ -305,27 +246,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: Spacing.three,
     color: colors.text,
-    fontSize: typography.body.fontSize,
-  },
-  dateValue: {
-    color: colors.text,
-    fontSize: typography.body.fontSize,
-  },
-  pickerWrap: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 12,
-    marginTop: Spacing.one,
-    overflow: 'hidden',
-  },
-  pickerDoneButton: {
-    alignItems: 'center',
-    paddingVertical: Spacing.two,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.background,
-  },
-  pickerDoneText: {
-    color: colors.primaryAccent,
-    fontWeight: '700',
     fontSize: typography.body.fontSize,
   },
   toggleRow: {
@@ -372,14 +292,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three,
     alignItems: 'center',
     marginTop: Spacing.four,
-  },
-  saveButtonSuccess: {
-    backgroundColor: colors.chartSage,
-  },
-  saveButtonSuccessContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
   },
   saveButtonText: {
     color: colors.background,

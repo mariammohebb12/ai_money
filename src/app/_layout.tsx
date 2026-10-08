@@ -48,6 +48,8 @@ function RootNavigator() {
         <Stack.Screen name="add-bill" options={{ presentation: 'modal' }} />
         <Stack.Screen name="change-password" options={{ presentation: 'modal' }} />
         <Stack.Screen name="bills" />
+        <Stack.Screen name="goals" />
+        <Stack.Screen name="edit-budgets" />
       </Stack.Protected>
 
       <Stack.Protected guard={!session}>

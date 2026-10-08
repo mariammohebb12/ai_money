@@ -1,5 +1,5 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
@@ -12,7 +12,7 @@ import { Spacing, colors, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useSaveSuccess } from '@/hooks/use-save-success';
 import { toDateString } from '@/lib/dates';
-import { GOAL_ICON_OPTIONS, type GoalIcon } from '@/lib/goal-icons';
+import { GOAL_ICON_OPTIONS, suggestGoalIcon, type GoalIcon } from '@/lib/goal-icons';
 import { supabase } from '@/lib/supabase';
 
 export default function AddGoalScreen() {
@@ -29,6 +29,13 @@ export default function AddGoalScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const { justSaved, triggerSuccess } = useSaveSuccess(() => router.back());
   const [icon, setIcon] = useState<GoalIcon>(GOAL_ICON_OPTIONS[0]);
+  // Once the user picks an icon themselves, stop overwriting it as they keep typing.
+  const [iconTouched, setIconTouched] = useState(false);
+
+  function handleNameChange(value: string) {
+    setName(value);
+    if (!iconTouched) setIcon(suggestGoalIcon(value));
+  }
 
   async function handleSave() {
     setErrorMessage('');
@@ -95,9 +102,16 @@ export default function AddGoalScreen() {
             return (
               <Pressable
                 key={option}
-                onPress={() => setIcon(option)}
+                onPress={() => {
+                  setIconTouched(true);
+                  setIcon(option);
+                }}
                 style={[styles.iconOption, isSelected && styles.iconOptionSelected]}>
-                <Text style={styles.iconOptionEmoji}>{option}</Text>
+                <MaterialCommunityIcons
+                  name={option as any}
+                  size={20}
+                  color={isSelected ? colors.primaryAccent : colors.text}
+                />
               </Pressable>
             );
           })}
@@ -107,7 +121,7 @@ export default function AddGoalScreen() {
         <TextInput
           style={styles.input}
           value={name}
-          onChangeText={setName}
+          onChangeText={handleNameChange}
           placeholder="e.g. Emergency fund, Trip to Japan"
           placeholderTextColor={colors.textMuted}
         />
@@ -256,9 +270,6 @@ const styles = StyleSheet.create({
   iconOptionSelected: {
     backgroundColor: colors.primaryAccent + '26',
     borderColor: colors.primaryAccent,
-  },
-  iconOptionEmoji: {
-    fontSize: 20,
   },
   saveButton: {
     backgroundColor: colors.primaryAccent,

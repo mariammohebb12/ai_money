@@ -1,15 +1,17 @@
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AiInsightCard } from '@/components/ai-insight-card';
+import { ScreenHeader } from '@/components/screen-header';
 import { Spacing, colors, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useCountUp } from '@/hooks/use-count-up';
 import { useCurrency } from '@/hooks/use-currency';
-import { addDays, describeDueDate, fromDateString, startOfToday, toDateString } from '@/lib/dates';
+import { addDays, describeDueDate, fromDateString, getGreeting, startOfToday, toDateString } from '@/lib/dates';
+import { normalizeGoalIcon } from '@/lib/goal-icons';
 import { supabase } from '@/lib/supabase';
 
 type Goal = {
@@ -35,7 +37,7 @@ export default function HomeScreen() {
   const { session } = useAuth();
   const { formatAmount } = useCurrency();
   const today = new Date();
-  const dateLabel = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  const dateLabel = today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   const [totalIncome, setTotalIncome] = useState(0);
   const [totalExpenses, setTotalExpenses] = useState(0);
@@ -157,8 +159,7 @@ export default function HomeScreen() {
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.primaryAccent} />
         }>
-        <Text style={styles.header}>Good morning 👋</Text>
-        <Text style={styles.date}>{dateLabel}</Text>
+        <ScreenHeader title={getGreeting()} subtitle={dateLabel} />
 
       {isLoading ? (
         <ActivityIndicator style={styles.loading} color={colors.primaryAccent} />
@@ -176,28 +177,42 @@ export default function HomeScreen() {
       <View style={styles.flowSection}>
         <View style={styles.flowBlock}>
           <View style={[styles.flowIconBadge, { backgroundColor: colors.chartSage + '1F' }]}>
-            <Feather name="trending-up" size={18} color={colors.chartSage} />
+            <Feather name="trending-up" size={15} color={colors.chartSage} />
           </View>
           <Text style={styles.flowLabel}>Income</Text>
-          <Text style={[styles.flowAmount, { color: colors.chartSage }]}>
+          <Text
+            style={[styles.flowAmount, { color: colors.chartSage }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}>
             {formatAmount(totalIncome)}
           </Text>
         </View>
+        <View style={styles.flowDivider} />
         <View style={styles.flowBlock}>
           <View style={[styles.flowIconBadge, { backgroundColor: colors.secondaryAccent + '1F' }]}>
-            <Feather name="trending-down" size={18} color={colors.secondaryAccent} />
+            <Feather name="trending-down" size={15} color={colors.secondaryAccent} />
           </View>
           <Text style={styles.flowLabel}>Expenses</Text>
-          <Text style={[styles.flowAmount, { color: colors.secondaryAccent }]}>
+          <Text
+            style={[styles.flowAmount, { color: colors.secondaryAccent }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}>
             {formatAmount(totalExpenses)}
           </Text>
         </View>
+        <View style={styles.flowDivider} />
         <View style={styles.flowBlock}>
           <View style={[styles.flowIconBadge, { backgroundColor: colors.primaryAccent + '1F' }]}>
-            <Feather name="save" size={18} color={colors.primaryAccent} />
+            <Feather name="save" size={15} color={colors.primaryAccent} />
           </View>
           <Text style={styles.flowLabel}>Saved</Text>
-          <Text style={[styles.flowAmount, { color: colors.primaryAccent }]}>
+          <Text
+            style={[styles.flowAmount, { color: colors.primaryAccent }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}>
             {formatAmount(balance)}
           </Text>
         </View>
@@ -222,14 +237,19 @@ export default function HomeScreen() {
           <Text style={styles.goalsEmptyText}>No goals yet — add one to start saving toward something.</Text>
         </View>
       ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.goalsScroll}>
-          {goals.map((goal) => (
-            <GoalCard key={goal.id} goal={goal} />
-          ))}
-        </ScrollView>
+        <>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.goalsScroll}>
+            {goals.map((goal) => (
+              <GoalCard key={goal.id} goal={goal} />
+            ))}
+          </ScrollView>
+          <Pressable onPress={() => router.push('/goals')}>
+            <Text style={styles.seeAllLink}>Manage goals</Text>
+          </Pressable>
+        </>
       )}
 
       <View style={styles.billsHeader}>
@@ -297,34 +317,40 @@ function GoalCard({ goal }: { goal: Goal }) {
 
   return (
     <View style={styles.goalCard}>
-      <View style={styles.goalCardHeader}>
-        <View style={styles.goalIconBadge}>
-          {goal.icon ? (
-            <Text style={styles.goalIconEmoji}>{goal.icon}</Text>
-          ) : (
-            <Feather name="target" size={14} color={colors.primaryAccent} />
-          )}
+      <View>
+        <View style={styles.goalCardHeader}>
+          <View style={styles.goalIconBadge}>
+            <MaterialCommunityIcons
+              name={(normalizeGoalIcon(goal.icon) ?? 'target') as any}
+              size={12}
+              color={colors.primaryAccent}
+            />
+          </View>
+          <Text style={styles.goalName} numberOfLines={1}>
+            {goal.name}
+          </Text>
+          <Pressable
+            style={styles.addFundsButton}
+            onPress={() => router.push({ pathname: '/add-funds', params: { goalId: String(goal.id) } })}>
+            <Feather name="plus" size={12} color={colors.primaryAccent} />
+          </Pressable>
         </View>
-        <Text style={styles.goalName}>{goal.name}</Text>
-        <Pressable
-          style={styles.addFundsButton}
-          onPress={() => router.push({ pathname: '/add-funds', params: { goalId: String(goal.id) } })}>
-          <Feather name="plus" size={14} color={colors.primaryAccent} />
-        </Pressable>
-      </View>
-      <Text style={styles.goalAmount}>
-        {formatAmount(goal.current_amount)}
-        <Text style={styles.goalAmountTarget}> / {formatAmount(goal.target_amount)}</Text>
-      </Text>
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-      </View>
-      {dateLabel ? (
-        <View style={styles.goalDateRow}>
-          <Feather name="calendar" size={11} color={colors.text} style={styles.goalDateIcon} />
-          <Text style={styles.goalDate}>{dateLabel}</Text>
+        <Text style={styles.goalAmount} numberOfLines={1}>
+          {formatAmount(goal.current_amount)}
+          <Text style={styles.goalAmountTarget}> / {formatAmount(goal.target_amount)}</Text>
+        </Text>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
         </View>
-      ) : null}
+      </View>
+      <View style={styles.goalDateRow}>
+        {dateLabel ? (
+          <>
+            <Feather name="calendar" size={10} color={colors.text} style={styles.goalDateIcon} />
+            <Text style={styles.goalDate}>{dateLabel}</Text>
+          </>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -340,16 +366,6 @@ const styles = StyleSheet.create({
   },
   loading: {
     marginTop: Spacing.six,
-  },
-  header: {
-    color: colors.text,
-    fontSize: typography.title.fontSize,
-    fontWeight: typography.title.fontWeight,
-  },
-  date: {
-    color: colors.textMuted,
-    fontSize: typography.body.fontSize,
-    marginTop: Spacing.one,
   },
   balanceSection: {
     marginTop: Spacing.four,
@@ -383,9 +399,10 @@ const styles = StyleSheet.create({
     marginTop: Spacing.five,
     backgroundColor: colors.cardBackground,
     borderRadius: 20,
-    padding: Spacing.four,
+    paddingVertical: Spacing.four,
+    paddingHorizontal: Spacing.two,
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    alignItems: 'center',
     shadowColor: colors.text,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -393,24 +410,31 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   flowBlock: {
+    flex: 1,
     alignItems: 'center',
     gap: Spacing.one,
   },
+  flowDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 40,
+    backgroundColor: colors.background,
+  },
   flowIconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
   flowLabel: {
     color: colors.textMuted,
-    fontSize: typography.caption.fontSize,
+    fontSize: 12,
   },
   flowAmount: {
-    fontSize: typography.body.fontSize,
+    fontSize: 15,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
+    paddingHorizontal: Spacing.one,
   },
   goalsHeader: {
     marginTop: Spacing.five,
@@ -461,9 +485,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   goalCard: {
-    width: 180,
+    width: 208,
+    height: 100,
     backgroundColor: colors.cardBackground,
-    borderRadius: 20,
+    borderRadius: 18,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     shadowColor: colors.text,
@@ -476,47 +501,44 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: Spacing.two,
+    gap: Spacing.one,
   },
   goalIconBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: colors.primaryAccent + '1F',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  goalIconEmoji: {
-    fontSize: 14,
-  },
   goalName: {
     flex: 1,
     color: colors.text,
-    fontSize: typography.body.fontSize,
+    fontSize: 13,
     fontWeight: '700',
   },
   addFundsButton: {
     backgroundColor: colors.background,
-    borderRadius: 12,
-    width: 22,
-    height: 22,
+    borderRadius: 10,
+    width: 20,
+    height: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   goalAmount: {
     color: colors.text,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     marginTop: Spacing.one,
     fontVariant: ['tabular-nums'],
   },
   goalAmountTarget: {
     color: colors.textMuted,
-    fontSize: typography.caption.fontSize,
+    fontSize: 11,
     fontWeight: '400',
   },
   progressTrack: {
-    height: 6,
+    height: 5,
     borderRadius: 3,
     backgroundColor: colors.background,
     marginTop: Spacing.one,
@@ -530,6 +552,7 @@ const styles = StyleSheet.create({
   goalDateRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    height: 14,
     marginTop: Spacing.one,
   },
   goalDateIcon: {
@@ -537,7 +560,7 @@ const styles = StyleSheet.create({
   },
   goalDate: {
     color: colors.textMuted,
-    fontSize: 12,
+    fontSize: 10,
   },
   billsHeader: {
     marginTop: Spacing.five,

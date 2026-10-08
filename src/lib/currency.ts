@@ -13,11 +13,25 @@ export const CURRENCY_OPTIONS: { value: CurrencyCode; label: string }[] = [
   { value: 'INR', label: 'INR — Indian Rupee' },
 ];
 
+// JPY (and similarly zero-decimal currencies) is quoted in whole units, not cents.
+const ZERO_DECIMAL_CURRENCIES = new Set<CurrencyCode>(['JPY']);
+
 // Formats an amount using a currency's standard symbol/decimal conventions.
 // This is display formatting only — the underlying number is never converted
 // between currencies, it's shown as-is with a different symbol/format.
+//
+// Grouping separators are inserted manually rather than relying on
+// Intl.NumberFormat('en-US', ...).format() to do it — some Hermes builds
+// (notably older Android configs) ship without full ICU grouping data and
+// silently return digits with no thousand separators.
 export function formatCurrency(amount: number, currency: CurrencyCode) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+  const symbol = getCurrencySymbol(currency);
+  const decimals = ZERO_DECIMAL_CURRENCIES.has(currency) ? 0 : 2;
+  const [whole, fraction] = Math.abs(amount).toFixed(decimals).split('.');
+  const groupedWhole = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const value = fraction ? `${groupedWhole}.${fraction}` : groupedWhole;
+  const spacer = /[A-Za-z]$/.test(symbol) ? ' ' : '';
+  return `${amount < 0 ? '-' : ''}${symbol}${spacer}${value}`;
 }
 
 // The standalone symbol/code for a currency (e.g. "$", "€", "E£"), for use as

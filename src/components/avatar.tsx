@@ -46,7 +46,7 @@ export function Avatar({
 
 const styles = StyleSheet.create({
   wrapper: {
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
   },
   image: {
     backgroundColor: colors.cardBackground,

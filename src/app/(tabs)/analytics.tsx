@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Circle, G, Svg } from 'react-native-svg';
 
 import { AiInsightCard } from '@/components/ai-insight-card';
+import { ScreenHeader } from '@/components/screen-header';
 import { Spacing, colors, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useCurrency } from '@/hooks/use-currency';
@@ -114,6 +115,7 @@ const RADIUS = (CHART_SIZE - STROKE_WIDTH) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 export default function AnalyticsScreen() {
+  const router = useRouter();
   const { session } = useAuth();
   const { formatAmount } = useCurrency();
 
@@ -128,6 +130,10 @@ export default function AnalyticsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | number | null>(null);
+  // Budgets are inherently monthly, so this tracks true calendar-month-to-date
+  // spend per category — independent of whatever period tab is selected above.
+  const [budgetLimits, setBudgetLimits] = useState<Record<string, number>>({});
+  const [monthToDateByCategory, setMonthToDateByCategory] = useState<Record<string, number>>({});
 
   const { start, end } = useMemo(
     () => getRangeForPreset(preset, customStart, customEnd),
@@ -141,8 +147,10 @@ export default function AnalyticsScreen() {
     const rangeStart = new Date(startTime);
     const rangeEnd = new Date(endTime);
     const { previousStart, previousEnd } = getPreviousRange(rangeStart, rangeEnd);
+    const monthStart = startOfMonth(startOfToday());
+    const today = startOfToday();
 
-    const [currentResult, previousResult] = await Promise.all([
+    const [currentResult, previousResult, budgetsResult, monthToDateResult] = await Promise.all([
       supabase
         .from('transactions')
         .select('amount, type, category:categories(id, name, color)')
@@ -155,6 +163,14 @@ export default function AnalyticsScreen() {
         .eq('user_id', session.user.id)
         .gte('transaction_date', toDateString(previousStart))
         .lte('transaction_date', toDateString(previousEnd)),
+      supabase.from('budgets').select('category_id, monthly_limit').eq('user_id', session.user.id),
+      supabase
+        .from('transactions')
+        .select('amount, category_id')
+        .eq('user_id', session.user.id)
+        .eq('type', 'expense')
+        .gte('transaction_date', toDateString(monthStart))
+        .lte('transaction_date', toDateString(today)),
     ]);
 
     if (currentResult.error) {
@@ -173,6 +189,24 @@ export default function AnalyticsScreen() {
       setPreviousIncomeTotal(
         previousRows.filter((row) => row.type === 'income').reduce((sum, row) => sum + row.amount, 0)
       );
+    }
+
+    if (budgetsResult.error) {
+      console.error('Failed to fetch budgets:', budgetsResult.error.message);
+    } else {
+      const limits: Record<string, number> = {};
+      for (const row of budgetsResult.data) limits[row.category_id] = row.monthly_limit;
+      setBudgetLimits(limits);
+    }
+
+    if (monthToDateResult.error) {
+      console.error('Failed to fetch month-to-date spending:', monthToDateResult.error.message);
+    } else {
+      const totals: Record<string, number> = {};
+      for (const row of monthToDateResult.data) {
+        totals[row.category_id] = (totals[row.category_id] ?? 0) + row.amount;
+      }
+      setMonthToDateByCategory(totals);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, startTime, endTime]);
@@ -256,7 +290,7 @@ export default function AnalyticsScreen() {
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.primaryAccent} />
         }>
-        <Text style={styles.title}>Analytics</Text>
+        <ScreenHeader title="Analytics" subtitle="Track spending, saving, and trends" />
 
         <PeriodFilter
           preset={preset}
@@ -353,7 +387,13 @@ export default function AnalyticsScreen() {
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Spending by category</Text>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>Spending by category</Text>
+                <Pressable style={styles.budgetsLink} onPress={() => router.push('/edit-budgets')}>
+                  <Feather name="sliders" size={13} color={colors.primaryAccent} />
+                  <Text style={styles.budgetsLinkText}>Budgets</Text>
+                </Pressable>
+              </View>
               {breakdown.length === 0 ? (
                 <Text style={styles.sectionSubtitle}>No expenses in this period.</Text>
               ) : (
@@ -369,6 +409,11 @@ export default function AnalyticsScreen() {
                     {breakdown.map(({ category, total }) => {
                       const isSelected = selectedCategoryId === category.id;
                       const percent = totalSpending > 0 ? Math.round((total / totalSpending) * 100) : 0;
+                      const limit = budgetLimits[category.id];
+                      const hasBudget = limit !== undefined;
+                      const spentThisMonth = monthToDateByCategory[category.id] ?? 0;
+                      const budgetRatio = hasBudget ? spentThisMonth / limit : 0;
+                      const isNearOrOverBudget = hasBudget && budgetRatio >= 0.8;
                       return (
                         <View
                           key={category.id}
@@ -387,6 +432,24 @@ export default function AnalyticsScreen() {
                               ]}
                             />
                           </View>
+
+                          {hasBudget && (
+                            <View style={styles.budgetRow}>
+                              <Text style={[styles.budgetText, isNearOrOverBudget && styles.budgetTextWarning]}>
+                                This month: {formatAmount(spentThisMonth)} / {formatAmount(limit)} budget
+                                {budgetRatio >= 1 ? ' · Over budget' : budgetRatio >= 0.8 ? ' · Close to limit' : ''}
+                              </Text>
+                              <View style={styles.budgetTrack}>
+                                <View
+                                  style={[
+                                    styles.budgetFill,
+                                    isNearOrOverBudget ? styles.budgetFillWarning : styles.budgetFillOk,
+                                    { width: `${Math.min(budgetRatio, 1) * 100}%` },
+                                  ]}
+                                />
+                              </View>
+                            </View>
+                          )}
                         </View>
                       );
                     })}
@@ -558,11 +621,6 @@ const styles = StyleSheet.create({
   content: {
     padding: Spacing.four,
   },
-  title: {
-    color: colors.text,
-    fontSize: typography.title.fontSize,
-    fontWeight: typography.title.fontWeight,
-  },
   loading: {
     marginTop: Spacing.six,
   },
@@ -653,6 +711,21 @@ const styles = StyleSheet.create({
     fontWeight: typography.sectionLabel.fontWeight,
     textTransform: typography.sectionLabel.textTransform,
     letterSpacing: typography.sectionLabel.letterSpacing,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  budgetsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  budgetsLinkText: {
+    color: colors.primaryAccent,
+    fontSize: 13,
+    fontWeight: '700',
   },
   sectionSubtitle: {
     color: colors.textMuted,
@@ -784,6 +857,37 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     borderRadius: 3,
+  },
+  budgetRow: {
+    marginTop: Spacing.two,
+    paddingTop: Spacing.two,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.text + '14',
+  },
+  budgetText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  budgetTextWarning: {
+    color: colors.secondaryAccent,
+  },
+  budgetTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.cardBackground,
+    marginTop: Spacing.one,
+    overflow: 'hidden',
+  },
+  budgetFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  budgetFillOk: {
+    backgroundColor: colors.chartSage,
+  },
+  budgetFillWarning: {
+    backgroundColor: colors.secondaryAccent,
   },
   emptyState: {
     alignItems: 'center',

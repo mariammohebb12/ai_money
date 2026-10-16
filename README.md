@@ -1,56 +1,38 @@
-# Welcome to your Expo app 👋
+AI Money: AI Personal Finance App
+AI Money is an AI-powered personal finance app for iOS and Android that helps people track spending, savings and bills, and turns their data into clear insights. I built the whole cross-platform experience with React Native, Expo and Supabase.
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Features
+Expense and bill tracking
 
-## Get started
+Categorize income and expenses
+Set custom savings goals
+Manage recurring bills
+Analytics
 
-1. Install dependencies
+Spending breakdowns by category
+Date filtering
+Automated financial insights on the Home and Analytics screens
+AI financial coach
 
-   ```bash
-   npm install
-   ```
+OpenAI-powered coach that answers natural-language questions about your own data, for example "how much did I spend on food?"
+Answers are based on the user's real financial records
+Tech stack
+React Native with Expo
+TypeScript
+Supabase (PostgreSQL and authentication)
+OpenAI API
+Challenges and solutions
+Secure, real-time relational data with fast AI answers. Financial data is relational and private, and the coach needs it quickly. I designed the database schema around the questions users ask, and kept the Supabase and OpenAI integration layers lean, so screens render smoothly and answers come back fast.
 
-2. Start the app
+Getting started
+bash
+npm install
+npx expo start
+Then press i for the iOS simulator, a for the Android emulator, or scan the QR code with Expo Go.
 
-   ```bash
-   npx expo start
-   ```
+Database: create a Supabase project and add your Supabase URL and anon key plus your OpenAI key to the app's environment configuration. Demo data is available in seed-demo-data.sql, and undo-seed-demo-data.sql removes it.
 
-In the output, you'll find options to open the app in a
+Author
+Mariam Moheb, mobile and full-stack developer.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Claude finished the response
